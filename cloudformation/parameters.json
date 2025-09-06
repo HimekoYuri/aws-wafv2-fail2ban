@@ -1,0 +1,38 @@
+[
+  {
+    "ParameterKey": "DomainName",
+    "ParameterValue": "download.lovelive-presents.com"
+  },
+  {
+    "ParameterKey": "CountThreshold",
+    "ParameterValue": "50"
+  },
+  {
+    "ParameterKey": "RateLimitRequests",
+    "ParameterValue": "100"
+  },
+  {
+    "ParameterKey": "TargetPath",
+    "ParameterValue": "/website"
+  },
+  {
+    "ParameterKey": "WhitelistIPs",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "BlacklistIPs",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "NotificationEmail",
+    "ParameterValue": "admin@example.com"
+  },
+  {
+    "ParameterKey": "SlackWebhookUrl",
+    "ParameterValue": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+  },
+  {
+    "ParameterKey": "SlackChannel",
+    "ParameterValue": "aws_system_notify"
+  }
+]
