@@ -1,0 +1,460 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS WAFv2 Advanced Fail2ban Integration with SNS and Slack notifications'
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: 'download.lovelive-presents.com'
+    Description: 'Domain name for the website'
+  
+  CountThreshold:
+    Type: Number
+    Default: 50
+    Description: 'Count threshold for alerts'
+  
+  RateLimitRequests:
+    Type: Number
+    Default: 100
+    Description: 'Block threshold (requests in 5-minute window)'
+  
+  TargetPath:
+    Type: String
+    Default: '/website'
+    Description: 'Target path to monitor for rate limiting'
+  
+  WhitelistIPs:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: 'Comma-delimited list of IP addresses to whitelist'
+  
+  BlacklistIPs:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: 'Comma-delimited list of IP addresses to blacklist'
+  
+  NotificationEmail:
+    Type: String
+    Default: ''
+    Description: 'Email address for SNS notifications'
+  
+  SlackWebhookUrl:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: 'Slack webhook URL for notifications'
+  
+  SlackChannel:
+    Type: String
+    Default: 'aws_system_notify'
+    Description: 'Slack channel name for notifications'
+
+Conditions:
+  HasNotificationEmail: !Not [!Equals [!Ref NotificationEmail, '']]
+  HasSlackWebhook: !Not [!Equals [!Ref SlackWebhookUrl, '']]
+  HasWhitelistIPs: !Not [!Equals [!Join ['', !Ref WhitelistIPs], '']]
+  HasBlacklistIPs: !Not [!Equals [!Join ['', !Ref BlacklistIPs], '']]
+
+Resources:
+  # WAF IP Sets
+  WhitelistIPSet:
+    Type: AWS::WAFv2::IPSet
+    Properties:
+      Name: fail2ban-whitelist
+      Scope: CLOUDFRONT
+      IPAddressVersion: IPV4
+      Addresses: !If [HasWhitelistIPs, !Ref WhitelistIPs, []]
+      Tags:
+        - Key: Name
+          Value: fail2ban-whitelist
+        - Key: Project
+          Value: aws-wafv2-fail2ban
+
+  BlacklistIPSet:
+    Type: AWS::WAFv2::IPSet
+    Properties:
+      Name: fail2ban-blacklist
+      Scope: CLOUDFRONT
+      IPAddressVersion: IPV4
+      Addresses: !If [HasBlacklistIPs, !Ref BlacklistIPs, []]
+      Tags:
+        - Key: Name
+          Value: fail2ban-blacklist
+        - Key: Project
+          Value: aws-wafv2-fail2ban
+
+  # WAF Web ACL
+  Fail2banWebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: fail2ban-waf-acl
+      Scope: CLOUDFRONT
+      DefaultAction:
+        Allow: {}
+      Rules:
+        - Name: WhiteListRule
+          Priority: 1
+          Action:
+            Allow: {}
+          Statement:
+            IPSetReferenceStatement:
+              Arn: !GetAtt WhitelistIPSet.Arn
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: WhiteListRule
+        - Name: BlackListRule
+          Priority: 2
+          Action:
+            Block: {}
+          Statement:
+            IPSetReferenceStatement:
+              Arn: !GetAtt BlacklistIPSet.Arn
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: BlackListRule
+        - Name: CountRule
+          Priority: 3
+          Action:
+            Count: {}
+          Statement:
+            RateBasedStatement:
+              Limit: !Ref CountThreshold
+              AggregateKeyType: IP
+              EvaluationWindowSec: 300
+              ScopeDownStatement:
+                ByteMatchStatement:
+                  SearchString: !Ref TargetPath
+                  FieldToMatch:
+                    UriPath: {}
+                  TextTransformations:
+                    - Priority: 0
+                      Type: LOWERCASE
+                  PositionalConstraint: STARTS_WITH
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: CountRule
+        - Name: BlockRule
+          Priority: 4
+          Action:
+            Block: {}
+          Statement:
+            RateBasedStatement:
+              Limit: !Ref RateLimitRequests
+              AggregateKeyType: IP
+              EvaluationWindowSec: 300
+              ScopeDownStatement:
+                ByteMatchStatement:
+                  SearchString: !Ref TargetPath
+                  FieldToMatch:
+                    UriPath: {}
+                  TextTransformations:
+                    - Priority: 0
+                      Type: LOWERCASE
+                  PositionalConstraint: STARTS_WITH
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: BlockRule
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: fail2banWebACL
+      Tags:
+        - Key: Name
+          Value: fail2ban-waf-acl
+        - Key: Project
+          Value: aws-wafv2-fail2ban
+
+  # CloudWatch Log Group
+  WAFLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/wafv2/fail2ban
+      RetentionInDays: 30
+      Tags:
+        - Key: Name
+          Value: fail2ban-waf-logs
+        - Key: Project
+          Value: aws-wafv2-fail2ban
+
+  # WAF Logging Configuration
+  WAFLoggingConfiguration:
+    Type: AWS::WAFv2::LoggingConfiguration
+    Properties:
+      ResourceArn: !GetAtt Fail2banWebACL.Arn
+      LogDestinationConfigs:
+        - !GetAtt WAFLogGroup.Arn
+      RedactedFields:
+        - SingleHeader:
+            Name: authorization
+        - SingleHeader:
+            Name: cookie
+
+  # SNS Topic
+  WAFNotificationsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: waf-fail2ban-notifications
+      Tags:
+        - Key: Name
+          Value: waf-fail2ban-notifications
+        - Key: Project
+          Value: aws-wafv2-fail2ban
+
+  # SNS Topic Policy
+  WAFNotificationsTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref WAFNotificationsTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudwatch.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref WAFNotificationsTopic
+
+  # Email Subscription
+  EmailNotificationSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasNotificationEmail
+    Properties:
+      TopicArn: !Ref WAFNotificationsTopic
+      Protocol: email
+      Endpoint: !Ref NotificationEmail
+
+  # Lambda Role for Slack Notifications
+  SlackNotifierRole:
+    Type: AWS::IAM::Role
+    Condition: HasSlackWebhook
+    Properties:
+      RoleName: waf-slack-notifier-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: waf-slack-notifier-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
+      Tags:
+        - Key: Name
+          Value: waf-slack-notifier-role
+        - Key: Project
+          Value: aws-wafv2-fail2ban
+
+  # Lambda Function for Slack Notifications
+  SlackNotifierFunction:
+    Type: AWS::Lambda::Function
+    Condition: HasSlackWebhook
+    Properties:
+      FunctionName: waf-slack-notifier
+      Runtime: python3.9
+      Handler: index.handler
+      Timeout: 30
+      Role: !GetAtt SlackNotifierRole.Arn
+      Environment:
+        Variables:
+          SLACK_WEBHOOK_URL: !Ref SlackWebhookUrl
+          SLACK_CHANNEL: !Ref SlackChannel
+      Code:
+        ZipFile: |
+          import json
+          import urllib3
+          import os
+
+          def handler(event, context):
+              webhook_url = os.environ['SLACK_WEBHOOK_URL']
+              channel = os.environ.get('SLACK_CHANNEL', 'aws_system_notify')
+              
+              # Parse SNS message
+              sns_message = json.loads(event['Records'][0]['Sns']['Message'])
+              
+              alarm_name = sns_message.get('AlarmName', 'Unknown')
+              alarm_description = sns_message.get('AlarmDescription', 'No description')
+              new_state = sns_message.get('NewStateValue', 'Unknown')
+              reason = sns_message.get('NewStateReason', 'No reason provided')
+              
+              # Determine color based on alarm state
+              color = "danger" if new_state == "ALARM" else "good" if new_state == "OK" else "warning"
+              
+              # Create Slack message
+              slack_message = {
+                  "channel": f"#{channel}",
+                  "username": "AWS WAF Alert",
+                  "icon_emoji": ":shield:",
+                  "attachments": [
+                      {
+                          "color": color,
+                          "title": f"WAF Alert: {alarm_name}",
+                          "text": alarm_description,
+                          "fields": [
+                              {
+                                  "title": "State",
+                                  "value": new_state,
+                                  "short": True
+                              },
+                              {
+                                  "title": "Channel",
+                                  "value": f"#{channel}",
+                                  "short": True
+                              },
+                              {
+                                  "title": "Reason",
+                                  "value": reason,
+                                  "short": False
+                              }
+                          ],
+                          "footer": "AWS WAFv2 Fail2ban System",
+                          "ts": int(context.aws_request_id.split('-')[0], 16) if context else None
+                      }
+                  ]
+              }
+              
+              # Send to Slack
+              http = urllib3.PoolManager()
+              response = http.request(
+                  'POST',
+                  webhook_url,
+                  body=json.dumps(slack_message),
+                  headers={'Content-Type': 'application/json'}
+              )
+              
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps(f'Message sent to Slack channel #{channel}')
+              }
+      Tags:
+        - Key: Name
+          Value: waf-slack-notifier
+        - Key: Project
+          Value: aws-wafv2-fail2ban
+
+  # Lambda Permission for SNS
+  SlackNotifierSNSPermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasSlackWebhook
+    Properties:
+      FunctionName: !Ref SlackNotifierFunction
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref WAFNotificationsTopic
+
+  # Slack Subscription
+  SlackNotificationSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasSlackWebhook
+    Properties:
+      TopicArn: !Ref WAFNotificationsTopic
+      Protocol: lambda
+      Endpoint: !GetAtt SlackNotifierFunction.Arn
+
+  # CloudWatch Alarms
+  CountThresholdAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: waf-count-threshold-exceeded
+      AlarmDescription: Count rule threshold exceeded - potential attack detected
+      MetricName: AllowedRequests
+      Namespace: AWS/WAFV2
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: !Ref CountThreshold
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: WebACL
+          Value: fail2ban-waf-acl
+        - Name: Rule
+          Value: CountRule
+      AlarmActions:
+        - !Ref WAFNotificationsTopic
+      Tags:
+        - Key: Name
+          Value: waf-count-threshold-alarm
+        - Key: Project
+          Value: aws-wafv2-fail2ban
+
+  BlockAddedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: waf-ip-blocked-alert
+      AlarmDescription: IP address has been blocked by rate limiting rule
+      MetricName: BlockedRequests
+      Namespace: AWS/WAFV2
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: WebACL
+          Value: fail2ban-waf-acl
+        - Name: Rule
+          Value: BlockRule
+      AlarmActions:
+        - !Ref WAFNotificationsTopic
+      Tags:
+        - Key: Name
+          Value: waf-ip-blocked-alarm
+        - Key: Project
+          Value: aws-wafv2-fail2ban
+
+  BlockClearedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: waf-ip-unblocked-alert
+      AlarmDescription: IP address block has been cleared
+      MetricName: BlockedRequests
+      Namespace: AWS/WAFV2
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      Dimensions:
+        - Name: WebACL
+          Value: fail2ban-waf-acl
+        - Name: Rule
+          Value: BlockRule
+      AlarmActions:
+        - !Ref WAFNotificationsTopic
+      Tags:
+        - Key: Name
+          Value: waf-ip-unblocked-alarm
+        - Key: Project
+          Value: aws-wafv2-fail2ban
+
+Outputs:
+  WebACLArn:
+    Description: 'ARN of the WAF Web ACL'
+    Value: !GetAtt Fail2banWebACL.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-WebACL-Arn'
+  
+  WebACLId:
+    Description: 'ID of the WAF Web ACL'
+    Value: !Ref Fail2banWebACL
+    Export:
+      Name: !Sub '${AWS::StackName}-WebACL-Id'
+  
+  SNSTopicArn:
+    Description: 'ARN of the SNS Topic for notifications'
+    Value: !Ref WAFNotificationsTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-SNS-Topic-Arn'

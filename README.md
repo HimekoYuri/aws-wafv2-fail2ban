@@ -71,41 +71,34 @@ cp terraform.tfvars.example terraform.tfvars
 # terraform.tfvarsを編集して環境に合わせて設定
 ```
 
-### 3. Makefileを使用した操作
+## デプロイ方法
+
+### Terraform
 
 ```bash
-# ヘルプ表示
-make help
-
-# 初期化
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# terraform.tfvarsを編集
 make init
-
-# 設定検証
-make validate
-
-# フォーマット
-make fmt
-
-# プラン確認
 make plan
-
-# 適用
 make apply
-
-# テスト実行
-make test
-
-# リソース削除
-make destroy
 ```
 
-### 4. スクリプトを使用した操作
+### CloudFormation
+
+```bash
+cd cloudformation
+# parameters.jsonを編集
+./deploy.sh
+```
+
+### スクリプトを使用した操作
 
 ```bash
 # テスト実行
 ./scripts/test.sh
 
-# デプロイ実行
+# デプロイ実行（Terraform）
 ./scripts/deploy.sh
 ```
 
