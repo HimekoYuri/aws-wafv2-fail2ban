@@ -135,3 +135,101 @@ resource "aws_lambda_permission" "sns_invoke" {
   principal     = "sns.amazonaws.com"
   source_arn    = aws_sns_topic.waf_notifications.arn
 }
+
+# Lambda function for Teams notifications
+resource "aws_lambda_function" "teams_notifier" {
+  count         = var.teams_webhook_url != "" ? 1 : 0
+  filename      = "teams_notifier.zip"
+  function_name = "waf-teams-notifier"
+  role          = aws_iam_role.teams_lambda_role[0].arn
+  handler       = "index.handler"
+  runtime       = "python3.9"
+  timeout       = 30
+
+  environment {
+    variables = {
+      TEAMS_WEBHOOK_URL = var.teams_webhook_url
+    }
+  }
+
+  tags = {
+    Name = "waf-teams-notifier"
+  }
+
+  depends_on = [data.archive_file.teams_notifier_zip[0]]
+}
+
+# Teams Lambda ZIP file
+data "archive_file" "teams_notifier_zip" {
+  count       = var.teams_webhook_url != "" ? 1 : 0
+  type        = "zip"
+  output_path = "teams_notifier.zip"
+
+  source {
+    content  = file("${path.module}/lambda/teams_notifier.py")
+    filename = "index.py"
+  }
+}
+
+# IAM role for Teams Lambda
+resource "aws_iam_role" "teams_lambda_role" {
+  count = var.teams_webhook_url != "" ? 1 : 0
+  name  = "waf-teams-notifier-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "waf-teams-notifier-role"
+  }
+}
+
+# IAM policy for Teams Lambda
+resource "aws_iam_role_policy" "teams_lambda_policy" {
+  count = var.teams_webhook_url != "" ? 1 : 0
+  name  = "waf-teams-notifier-policy"
+  role  = aws_iam_role.teams_lambda_role[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+# SNS subscription for Teams Lambda
+resource "aws_sns_topic_subscription" "teams_notification" {
+  count     = var.teams_webhook_url != "" ? 1 : 0
+  topic_arn = aws_sns_topic.waf_notifications.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.teams_notifier[0].arn
+}
+
+# Teams Lambda permission for SNS
+resource "aws_lambda_permission" "teams_sns_invoke" {
+  count         = var.teams_webhook_url != "" ? 1 : 0
+  statement_id  = "AllowExecutionFromSNS"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.teams_notifier[0].function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.waf_notifications.arn
+}
