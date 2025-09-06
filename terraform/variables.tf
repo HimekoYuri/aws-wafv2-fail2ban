@@ -70,3 +70,10 @@ variable "notification_email" {
   type        = string
   default     = ""
 }
+
+variable "teams_webhook_url" {
+  description = "Microsoft Teams webhook URL for notifications"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
