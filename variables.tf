@@ -1,21 +1,3 @@
-variable "aws_region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-east-1"
-}
-
-variable "aws_profile" {
-  description = "AWS profile name"
-  type        = string
-  default     = "YukiSunaoka"
-}
-
-variable "environment" {
-  description = "Environment name"
-  type        = string
-  default     = "production"
-}
-
 variable "domain_name" {
   description = "Domain name for the website"
   type        = string
@@ -44,4 +26,28 @@ variable "cloudfront_distribution_id" {
   description = "CloudFront distribution ID to associate with WAF"
   type        = string
   default     = ""
+}
+
+variable "whitelist_ips" {
+  description = "List of IP addresses to whitelist (never ban)"
+  type        = list(string)
+  default     = []
+}
+
+variable "blacklist_ips" {
+  description = "List of IP addresses to blacklist (always ban)"
+  type        = list(string)
+  default     = []
+}
+
+variable "count_threshold" {
+  description = "Threshold for count rule before triggering alerts"
+  type        = number
+  default     = 50
+}
+
+variable "enable_managed_rules" {
+  description = "Enable AWS managed rules (disabled per requirement)"
+  type        = bool
+  default     = false
 }

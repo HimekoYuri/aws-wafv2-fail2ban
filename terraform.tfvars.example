@@ -7,9 +7,24 @@ environment = "production"
 domain_name = "download.lovelive-presents.com"
 
 # Rate Limiting Configuration
-rate_limit_requests     = 100    # Number of requests in 5-minute window
-block_duration_seconds  = 3600   # Block duration in seconds (1 hour)
-target_path            = "/website"
+count_threshold        = 50     # Count threshold for alerts
+rate_limit_requests    = 100    # Block threshold (requests in 5-minute window)
+block_duration_seconds = 3600   # Block duration in seconds (1 hour)
+target_path           = "/website"
+
+# IP Lists Configuration
+whitelist_ips = [
+  # "192.168.1.0/24",  # Example: Internal network
+  # "10.0.0.1/32",     # Example: Specific trusted IP
+]
+
+blacklist_ips = [
+  # "203.0.113.0/24",  # Example: Known malicious network
+  # "198.51.100.1/32", # Example: Specific blocked IP
+]
 
 # CloudFront Configuration
 cloudfront_distribution_id = "E1234567890ABC"  # Replace with your CloudFront distribution ID
+
+# Security Configuration
+enable_managed_rules = false  # Disabled per requirement
