@@ -4,6 +4,7 @@ import os
 
 def handler(event, context):
     webhook_url = os.environ['SLACK_WEBHOOK_URL']
+    channel = os.environ.get('SLACK_CHANNEL', 'aws_system_notify')
     
     # Parse SNS message
     sns_message = json.loads(event['Records'][0]['Sns']['Message'])
@@ -18,6 +19,9 @@ def handler(event, context):
     
     # Create Slack message
     slack_message = {
+        "channel": f"#{channel}",
+        "username": "AWS WAF Alert",
+        "icon_emoji": ":shield:",
         "attachments": [
             {
                 "color": color,
@@ -30,12 +34,17 @@ def handler(event, context):
                         "short": True
                     },
                     {
+                        "title": "Channel",
+                        "value": f"#{channel}",
+                        "short": True
+                    },
+                    {
                         "title": "Reason",
                         "value": reason,
                         "short": False
                     }
                 ],
-                "footer": "AWS WAFv2 Fail2ban",
+                "footer": "AWS WAFv2 Fail2ban System",
                 "ts": int(context.aws_request_id.split('-')[0], 16) if context else None
             }
         ]
@@ -52,5 +61,5 @@ def handler(event, context):
     
     return {
         'statusCode': 200,
-        'body': json.dumps('Message sent to Slack')
+        'body': json.dumps(f'Message sent to Slack channel #{channel}')
     }

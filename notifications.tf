@@ -47,6 +47,7 @@ resource "aws_lambda_function" "slack_notifier" {
   environment {
     variables = {
       SLACK_WEBHOOK_URL = var.slack_webhook_url
+      SLACK_CHANNEL     = var.slack_channel
     }
   }
 
@@ -66,6 +67,7 @@ data "archive_file" "slack_notifier_zip" {
   source {
     content = templatefile("${path.module}/lambda/slack_notifier.py", {
       webhook_url = var.slack_webhook_url
+      channel     = var.slack_channel
     })
     filename = "index.py"
   }
