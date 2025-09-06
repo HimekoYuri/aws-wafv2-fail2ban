@@ -63,7 +63,7 @@ data "archive_file" "slack_notifier_zip" {
   count       = var.slack_webhook_url != "" ? 1 : 0
   type        = "zip"
   output_path = "slack_notifier.zip"
-  
+
   source {
     content = templatefile("${path.module}/lambda/slack_notifier.py", {
       webhook_url = var.slack_webhook_url
