@@ -45,3 +45,27 @@ variable "cloudfront_distribution_id" {
   type        = string
   default     = ""
 }
+
+variable "whitelist_ips" {
+  description = "List of IP addresses to whitelist (never ban)"
+  type        = list(string)
+  default     = []
+}
+
+variable "blacklist_ips" {
+  description = "List of IP addresses to blacklist (always ban)"
+  type        = list(string)
+  default     = []
+}
+
+variable "count_threshold" {
+  description = "Threshold for count rule before triggering alerts"
+  type        = number
+  default     = 50
+}
+
+variable "enable_managed_rules" {
+  description = "Enable AWS managed rules (disabled per requirement)"
+  type        = bool
+  default     = false
+}
