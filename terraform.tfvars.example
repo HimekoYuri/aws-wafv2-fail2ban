@@ -1,0 +1,15 @@
+# AWS Configuration
+aws_region  = "us-east-1"
+aws_profile = "YukiSunaoka"
+environment = "production"
+
+# Domain Configuration
+domain_name = "download.lovelive-presents.com"
+
+# Rate Limiting Configuration
+rate_limit_requests     = 100    # Number of requests in 5-minute window
+block_duration_seconds  = 3600   # Block duration in seconds (1 hour)
+target_path            = "/website"
+
+# CloudFront Configuration
+cloudfront_distribution_id = "E1234567890ABC"  # Replace with your CloudFront distribution ID
