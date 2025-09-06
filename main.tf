@@ -199,7 +199,7 @@ resource "aws_cloudwatch_metric_alarm" "count_threshold_alarm" {
   statistic           = "Sum"
   threshold           = var.count_threshold
   alarm_description   = "Count rule threshold exceeded - potential attack detected"
-  alarm_actions       = []
+  alarm_actions       = [aws_sns_topic.waf_notifications.arn]
 
   dimensions = {
     WebACL = aws_wafv2_web_acl.fail2ban_acl.name
@@ -222,7 +222,7 @@ resource "aws_cloudwatch_metric_alarm" "block_added_alarm" {
   statistic           = "Sum"
   threshold           = "0"
   alarm_description   = "IP address has been blocked by rate limiting rule"
-  alarm_actions       = []
+  alarm_actions       = [aws_sns_topic.waf_notifications.arn]
 
   dimensions = {
     WebACL = aws_wafv2_web_acl.fail2ban_acl.name
@@ -245,7 +245,7 @@ resource "aws_cloudwatch_metric_alarm" "block_cleared_alarm" {
   statistic           = "Sum"
   threshold           = "1"
   alarm_description   = "IP address block has been cleared"
-  alarm_actions       = []
+  alarm_actions       = [aws_sns_topic.waf_notifications.arn]
   treat_missing_data  = "breaching"
 
   dimensions = {

@@ -51,3 +51,22 @@ variable "enable_managed_rules" {
   type        = bool
   default     = false
 }
+
+variable "slack_webhook_url" {
+  description = "Slack webhook URL for notifications"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "slack_channel" {
+  description = "Slack channel name for notifications"
+  type        = string
+  default     = "aws_system_notify"
+}
+
+variable "notification_email" {
+  description = "Email address for SNS notifications"
+  type        = string
+  default     = ""
+}

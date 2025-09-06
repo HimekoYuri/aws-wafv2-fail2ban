@@ -28,3 +28,8 @@ cloudfront_distribution_id = "E1234567890ABC"  # Replace with your CloudFront di
 
 # Security Configuration
 enable_managed_rules = false  # Disabled per requirement
+
+# Notification Configuration
+notification_email = "admin@example.com"  # Email for SNS notifications
+slack_webhook_url  = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"  # Slack webhook URL
+slack_channel     = "aws_system_notify"   # Slack channel name (without #)
