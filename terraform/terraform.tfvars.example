@@ -34,3 +34,6 @@ notification_email = "admin@example.com"  # Email for SNS notifications
 slack_webhook_url  = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"  # Slack webhook URL
 slack_channel     = "aws_system_notify"   # Slack channel name (without #)
 teams_webhook_url  = "https://outlook.office.com/webhook/YOUR/TEAMS/WEBHOOK"  # Teams webhook URL
+
+# Lambda Configuration
+lambda_python_runtime = "python3.13"  # Python runtime version for Lambda functions

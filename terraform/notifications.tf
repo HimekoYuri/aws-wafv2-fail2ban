@@ -41,7 +41,7 @@ resource "aws_lambda_function" "slack_notifier" {
   function_name = "waf-slack-notifier"
   role          = aws_iam_role.lambda_role[0].arn
   handler       = "index.handler"
-  runtime       = "python3.9"
+  runtime       = var.lambda_python_runtime
   timeout       = 30
 
   environment {
@@ -143,7 +143,7 @@ resource "aws_lambda_function" "teams_notifier" {
   function_name = "waf-teams-notifier"
   role          = aws_iam_role.teams_lambda_role[0].arn
   handler       = "index.handler"
-  runtime       = "python3.9"
+  runtime       = var.lambda_python_runtime
   timeout       = 30
 
   environment {

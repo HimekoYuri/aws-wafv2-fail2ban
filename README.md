@@ -116,6 +116,7 @@ cd cloudformation
 | `slack_webhook_url` | "" | Slack Webhook URL |
 | `slack_channel` | "aws_system_notify" | Slackチャンネル名 |
 | `teams_webhook_url` | "" | Microsoft Teams Webhook URL |
+| `lambda_python_runtime` | "python3.13" | Lambda関数のPythonランタイムバージョン |
 
 ## アーキテクチャ
 
