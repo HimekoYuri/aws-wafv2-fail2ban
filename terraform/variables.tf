@@ -77,3 +77,14 @@ variable "teams_webhook_url" {
   default     = ""
   sensitive   = true
 }
+
+variable "lambda_python_runtime" {
+  description = "Python runtime version for Lambda functions"
+  type        = string
+  default     = "python3.13"
+
+  validation {
+    condition     = can(regex("^python3\\.(9|10|11|12|13)$", var.lambda_python_runtime))
+    error_message = "Lambda Python runtime must be python3.9, python3.10, python3.11, python3.12, or python3.13."
+  }
+}
