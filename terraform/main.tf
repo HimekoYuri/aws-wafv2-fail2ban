@@ -1,28 +1,7 @@
-# IP Set for WhiteList (永久にBANしない)
-resource "aws_wafv2_ip_set" "whitelist" {
-  name               = "fail2ban-whitelist"
-  scope              = "CLOUDFRONT"
-  ip_address_version = "IPV4"
-  addresses          = var.whitelist_ips
+# IP Sets are now defined in ip_sets.tf
 
-  tags = {
-    Name = "fail2ban-whitelist"
-  }
-}
-
-# IP Set for BlackList (ずっとBANする)
-resource "aws_wafv2_ip_set" "blacklist" {
-  name               = "fail2ban-blacklist"
-  scope              = "CLOUDFRONT"
-  ip_address_version = "IPV4"
-  addresses          = var.blacklist_ips
-
-  tags = {
-    Name = "fail2ban-blacklist"
-  }
-}
-
-# WAFv2 Web ACL for CloudFront
+# Advanced WAF ACL is now defined in advanced_rules.tf
+# Legacy WAF ACL for backward compatibility
 resource "aws_wafv2_web_acl" "fail2ban_acl" {
   name  = "fail2ban-waf-acl"
   scope = "CLOUDFRONT"

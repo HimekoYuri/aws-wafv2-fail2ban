@@ -78,6 +78,18 @@ variable "teams_webhook_url" {
   sensitive   = true
 }
 
+variable "enable_advanced_rules" {
+  description = "Enable advanced pattern matching and staged blocking rules"
+  type        = bool
+  default     = true
+}
+
+variable "enable_user_agent_filtering" {
+  description = "Enable suspicious User-Agent filtering"
+  type        = bool
+  default     = true
+}
+
 variable "lambda_python_runtime" {
   description = "Python runtime version for Lambda functions"
   type        = string
