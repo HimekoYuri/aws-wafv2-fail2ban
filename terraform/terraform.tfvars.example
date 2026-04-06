@@ -1,3 +1,7 @@
+# =============================================================================
+# AWS WAFv2 Fail2ban Configuration Example (2026年最新版)
+# =============================================================================
+
 # AWS Configuration
 aws_region  = "us-east-1"
 aws_profile = "YukiSunaoka"
@@ -7,10 +11,10 @@ environment = "production"
 domain_name = "download.lovelive-presents.com"
 
 # Rate Limiting Configuration
-count_threshold        = 50     # Count threshold for alerts
-rate_limit_requests    = 100    # Block threshold (requests in 5-minute window)
+count_threshold        = 100    # Count threshold for alerts (WAFv2 minimum: 100)
+rate_limit_requests    = 500    # Block threshold (requests in 5-minute window)
 block_duration_seconds = 3600   # Block duration in seconds (1 hour)
-target_path           = "/website"
+target_path            = "/website"
 
 # IP Lists Configuration
 whitelist_ips = [
@@ -24,16 +28,23 @@ blacklist_ips = [
 ]
 
 # CloudFront Configuration
-cloudfront_distribution_id = "E1234567890ABC"  # Replace with your CloudFront distribution ID
+cloudfront_distribution_id = "E1234567890ABC"
 
 # Security Configuration
-enable_managed_rules = false  # Disabled per requirement
+enable_managed_rules        = false
+enable_advanced_rules       = true
+enable_user_agent_filtering = true
+enable_ai_attack_protection = true   # 2026年AI駆動攻撃対策
+enable_api_abuse_protection = true   # API乱用・SSRF対策
+
+# IP TTL Configuration
+ip_ttl_hours = 24  # 24時間後に自動でoffenderリストから削除 (0=無期限)
 
 # Notification Configuration
-notification_email = "admin@example.com"  # Email for SNS notifications
-slack_webhook_url  = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"  # Slack webhook URL
-slack_channel     = "aws_system_notify"   # Slack channel name (without #)
-teams_webhook_url  = "https://outlook.office.com/webhook/YOUR/TEAMS/WEBHOOK"  # Teams webhook URL
+notification_email = "[email]"
+slack_webhook_url  = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+slack_channel      = "aws_system_notify"
+teams_webhook_url  = "https://outlook.office.com/webhook/YOUR/TEAMS/WEBHOOK"
 
 # Lambda Configuration
-lambda_python_runtime = "python3.13"  # Python runtime version for Lambda functions
+lambda_python_runtime = "python3.13"

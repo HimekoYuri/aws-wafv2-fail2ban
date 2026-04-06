@@ -1,4 +1,8 @@
-# 既存のIP Set（ホワイトリスト・ブラックリスト）
+# =============================================================================
+# IP Set定義 (IPv4 + IPv6 対応)
+# =============================================================================
+
+# ホワイトリスト (IPv4)
 resource "aws_wafv2_ip_set" "whitelist" {
   name               = "fail2ban-whitelist"
   scope              = "CLOUDFRONT"
@@ -10,6 +14,7 @@ resource "aws_wafv2_ip_set" "whitelist" {
   }
 }
 
+# ブラックリスト (IPv4)
 resource "aws_wafv2_ip_set" "blacklist" {
   name               = "fail2ban-blacklist"
   scope              = "CLOUDFRONT"
@@ -21,7 +26,7 @@ resource "aws_wafv2_ip_set" "blacklist" {
   }
 }
 
-# 段階的制裁システム用のIP Set
+# 段階的制裁システム用 IP Set
 resource "aws_wafv2_ip_set" "repeat_offenders" {
   name               = "fail2ban-repeat-offenders"
   scope              = "CLOUDFRONT"
@@ -30,6 +35,10 @@ resource "aws_wafv2_ip_set" "repeat_offenders" {
 
   tags = {
     Name = "fail2ban-repeat-offenders"
+  }
+
+  lifecycle {
+    ignore_changes = [addresses]
   }
 }
 
@@ -41,5 +50,9 @@ resource "aws_wafv2_ip_set" "heavy_offenders" {
 
   tags = {
     Name = "fail2ban-heavy-offenders"
+  }
+
+  lifecycle {
+    ignore_changes = [addresses]
   }
 }
