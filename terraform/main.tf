@@ -1,7 +1,8 @@
-# IP Sets are now defined in ip_sets.tf
+# =============================================================================
+# レガシーWAF ACL (後方互換性用・基本ルールのみ)
+# 高度なルールは advanced_rules.tf を参照
+# =============================================================================
 
-# Advanced WAF ACL is now defined in advanced_rules.tf
-# Legacy WAF ACL for backward compatibility
 resource "aws_wafv2_web_acl" "fail2ban_acl" {
   name  = "fail2ban-waf-acl"
   scope = "CLOUDFRONT"
@@ -10,7 +11,7 @@ resource "aws_wafv2_web_acl" "fail2ban_acl" {
     allow {}
   }
 
-  # Rule 1: WhiteList - 永久にBANしない (最高優先度)
+  # Rule 1: WhiteList
   rule {
     name     = "WhiteListRule"
     priority = 1
@@ -32,7 +33,7 @@ resource "aws_wafv2_web_acl" "fail2ban_acl" {
     }
   }
 
-  # Rule 2: BlackList - ずっとBANする
+  # Rule 2: BlackList
   rule {
     name     = "BlackListRule"
     priority = 2
@@ -91,7 +92,7 @@ resource "aws_wafv2_web_acl" "fail2ban_acl" {
     }
   }
 
-  # Rule 4: Block Rule - 実際のブロック用
+  # Rule 4: Block Rule
   rule {
     name     = "BlockRule"
     priority = 4
@@ -167,14 +168,14 @@ resource "aws_wafv2_web_acl_logging_configuration" "waf_logging" {
   }
 }
 
-# CloudWatch Alarm for Count Rule threshold exceeded
+# CloudWatch Alarms
 resource "aws_cloudwatch_metric_alarm" "count_threshold_alarm" {
   alarm_name          = "waf-count-threshold-exceeded"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
+  evaluation_periods  = 1
   metric_name         = "AllowedRequests"
   namespace           = "AWS/WAFV2"
-  period              = "300"
+  period              = 300
   statistic           = "Sum"
   threshold           = var.count_threshold
   alarm_description   = "Count rule threshold exceeded - potential attack detected"
@@ -190,16 +191,15 @@ resource "aws_cloudwatch_metric_alarm" "count_threshold_alarm" {
   }
 }
 
-# CloudWatch Alarm for Block Rule triggered (IP added to block list)
 resource "aws_cloudwatch_metric_alarm" "block_added_alarm" {
   alarm_name          = "waf-ip-blocked-alert"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
+  evaluation_periods  = 1
   metric_name         = "BlockedRequests"
   namespace           = "AWS/WAFV2"
-  period              = "300"
+  period              = 300
   statistic           = "Sum"
-  threshold           = "0"
+  threshold           = 0
   alarm_description   = "IP address has been blocked by rate limiting rule"
   alarm_actions       = [aws_sns_topic.waf_notifications.arn]
 
@@ -213,16 +213,15 @@ resource "aws_cloudwatch_metric_alarm" "block_added_alarm" {
   }
 }
 
-# CloudWatch Alarm for Block Rule cleared (IP removed from block list)
 resource "aws_cloudwatch_metric_alarm" "block_cleared_alarm" {
   alarm_name          = "waf-ip-unblocked-alert"
   comparison_operator = "LessThanThreshold"
-  evaluation_periods  = "2"
+  evaluation_periods  = 2
   metric_name         = "BlockedRequests"
   namespace           = "AWS/WAFV2"
-  period              = "300"
+  period              = 300
   statistic           = "Sum"
-  threshold           = "1"
+  threshold           = 1
   alarm_description   = "IP address block has been cleared"
   alarm_actions       = [aws_sns_topic.waf_notifications.arn]
   treat_missing_data  = "breaching"

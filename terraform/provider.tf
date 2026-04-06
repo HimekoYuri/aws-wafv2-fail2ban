@@ -7,6 +7,7 @@ provider "aws" {
       Project     = "aws-wafv2-fail2ban"
       Environment = var.environment
       ManagedBy   = "terraform"
+      UpdatedAt   = "2026-04"
     }
   }
 }

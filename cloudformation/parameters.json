@@ -5,11 +5,11 @@
   },
   {
     "ParameterKey": "CountThreshold",
-    "ParameterValue": "50"
+    "ParameterValue": "100"
   },
   {
     "ParameterKey": "RateLimitRequests",
-    "ParameterValue": "100"
+    "ParameterValue": "500"
   },
   {
     "ParameterKey": "TargetPath",
@@ -25,14 +25,26 @@
   },
   {
     "ParameterKey": "NotificationEmail",
-    "ParameterValue": "admin@example.com"
+    "ParameterValue": ""
   },
   {
     "ParameterKey": "SlackWebhookUrl",
-    "ParameterValue": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    "ParameterValue": ""
   },
   {
     "ParameterKey": "SlackChannel",
     "ParameterValue": "aws_system_notify"
+  },
+  {
+    "ParameterKey": "TeamsWebhookUrl",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "LambdaPythonRuntime",
+    "ParameterValue": "python3.13"
+  },
+  {
+    "ParameterKey": "IpTtlHours",
+    "ParameterValue": "24"
   }
 ]

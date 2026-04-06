@@ -1,0 +1,32 @@
+feat: 2026年最新化 - OWASP Top 10:2026対応 / AI駆動攻撃対策 / Terraform・CloudFormation最新化
+
+## Terraform
+- required_version >= 1.6, AWS Provider ~> 5.80
+- rate_based_statement構文バグ修正
+- pattern_sets.tf 正規表現エスケープ修正
+- IP Set lifecycle ignore_changes追加
+- IAMポリシー最小権限化
+- Lambda CloudWatch Log Group追加
+
+## CloudFormation
+- 段階的制裁システム完全統合 Stage 1-4
+- IP Manager Lambda / Teams通知Lambda追加
+- Regex Pattern Set 従来型 + モダン攻撃
+- Adaptive Card形式 MessageCard非推奨対応
+- パラメータバリデーション強化
+
+## 2026年攻撃動向対応
+- SSRF クラウドメタデータエンドポイント
+- NoSQLインジェクション / プロトタイプ汚染
+- GraphQLインジェクション / イントロスペクション乱用
+- Log4Shell / JNDI系攻撃
+- AI駆動スキャナ・自動化ツール検知
+- HTTP Flood / Slowloris 大量ヘッダー検知
+- エンコーディング回避攻撃
+
+## Lambda
+- Python 3.13 + 型ヒント
+- IP TTL自動期限切れ デフォルト24時間
+- WAFv2 OptimisticLock リトライ
+- CloudWatch Logs Insights ポーリング改善
+- Teams: Adaptive Card形式移行

@@ -1,4 +1,8 @@
-# SNS Topic for WAF notifications
+# =============================================================================
+# 通知システム (SNS + Slack + Teams)
+# =============================================================================
+
+# SNS Topic
 resource "aws_sns_topic" "waf_notifications" {
   name = "waf-fail2ban-notifications"
 
@@ -15,6 +19,7 @@ resource "aws_sns_topic_policy" "waf_notifications_policy" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "AllowCloudWatchPublish"
         Effect = "Allow"
         Principal = {
           Service = "cloudwatch.amazonaws.com"
@@ -26,7 +31,7 @@ resource "aws_sns_topic_policy" "waf_notifications_policy" {
   })
 }
 
-# Email subscription (if email provided)
+# Email subscription
 resource "aws_sns_topic_subscription" "email_notification" {
   count     = var.notification_email != "" ? 1 : 0
   topic_arn = aws_sns_topic.waf_notifications.arn
@@ -34,15 +39,26 @@ resource "aws_sns_topic_subscription" "email_notification" {
   endpoint  = var.notification_email
 }
 
-# Lambda function for Slack notifications
+# =============================================================================
+# Slack通知 Lambda
+# =============================================================================
+
+data "archive_file" "slack_notifier_zip" {
+  count       = var.slack_webhook_url != "" ? 1 : 0
+  type        = "zip"
+  source_file = "${path.module}/lambda/slack_notifier.py"
+  output_path = "${path.module}/lambda/slack_notifier.zip"
+}
+
 resource "aws_lambda_function" "slack_notifier" {
-  count         = var.slack_webhook_url != "" ? 1 : 0
-  filename      = "slack_notifier.zip"
-  function_name = "waf-slack-notifier"
-  role          = aws_iam_role.lambda_role[0].arn
-  handler       = "index.handler"
-  runtime       = var.lambda_python_runtime
-  timeout       = 30
+  count            = var.slack_webhook_url != "" ? 1 : 0
+  filename         = data.archive_file.slack_notifier_zip[0].output_path
+  function_name    = "waf-slack-notifier"
+  role             = aws_iam_role.lambda_role[0].arn
+  handler          = "slack_notifier.handler"
+  runtime          = var.lambda_python_runtime
+  timeout          = 30
+  source_code_hash = data.archive_file.slack_notifier_zip[0].output_base64sha256
 
   environment {
     variables = {
@@ -54,26 +70,8 @@ resource "aws_lambda_function" "slack_notifier" {
   tags = {
     Name = "waf-slack-notifier"
   }
-
-  depends_on = [data.archive_file.slack_notifier_zip[0]]
 }
 
-# Lambda ZIP file
-data "archive_file" "slack_notifier_zip" {
-  count       = var.slack_webhook_url != "" ? 1 : 0
-  type        = "zip"
-  output_path = "slack_notifier.zip"
-
-  source {
-    content = templatefile("${path.module}/lambda/slack_notifier.py", {
-      webhook_url = var.slack_webhook_url
-      channel     = var.slack_channel
-    })
-    filename = "index.py"
-  }
-}
-
-# IAM role for Lambda
 resource "aws_iam_role" "lambda_role" {
   count = var.slack_webhook_url != "" ? 1 : 0
   name  = "waf-slack-notifier-role"
@@ -96,7 +94,6 @@ resource "aws_iam_role" "lambda_role" {
   }
 }
 
-# IAM policy for Lambda
 resource "aws_iam_role_policy" "lambda_policy" {
   count = var.slack_webhook_url != "" ? 1 : 0
   name  = "waf-slack-notifier-policy"
@@ -112,13 +109,12 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "arn:aws:logs:*:*:*"
+        Resource = "arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:*"
       }
     ]
   })
 }
 
-# SNS subscription for Lambda (if Slack webhook provided)
 resource "aws_sns_topic_subscription" "slack_notification" {
   count     = var.slack_webhook_url != "" ? 1 : 0
   topic_arn = aws_sns_topic.waf_notifications.arn
@@ -126,7 +122,6 @@ resource "aws_sns_topic_subscription" "slack_notification" {
   endpoint  = aws_lambda_function.slack_notifier[0].arn
 }
 
-# Lambda permission for SNS
 resource "aws_lambda_permission" "sns_invoke" {
   count         = var.slack_webhook_url != "" ? 1 : 0
   statement_id  = "AllowExecutionFromSNS"
@@ -136,15 +131,26 @@ resource "aws_lambda_permission" "sns_invoke" {
   source_arn    = aws_sns_topic.waf_notifications.arn
 }
 
-# Lambda function for Teams notifications
+# =============================================================================
+# Teams通知 Lambda
+# =============================================================================
+
+data "archive_file" "teams_notifier_zip" {
+  count       = var.teams_webhook_url != "" ? 1 : 0
+  type        = "zip"
+  source_file = "${path.module}/lambda/teams_notifier.py"
+  output_path = "${path.module}/lambda/teams_notifier.zip"
+}
+
 resource "aws_lambda_function" "teams_notifier" {
-  count         = var.teams_webhook_url != "" ? 1 : 0
-  filename      = "teams_notifier.zip"
-  function_name = "waf-teams-notifier"
-  role          = aws_iam_role.teams_lambda_role[0].arn
-  handler       = "index.handler"
-  runtime       = var.lambda_python_runtime
-  timeout       = 30
+  count            = var.teams_webhook_url != "" ? 1 : 0
+  filename         = data.archive_file.teams_notifier_zip[0].output_path
+  function_name    = "waf-teams-notifier"
+  role             = aws_iam_role.teams_lambda_role[0].arn
+  handler          = "teams_notifier.handler"
+  runtime          = var.lambda_python_runtime
+  timeout          = 30
+  source_code_hash = data.archive_file.teams_notifier_zip[0].output_base64sha256
 
   environment {
     variables = {
@@ -155,23 +161,8 @@ resource "aws_lambda_function" "teams_notifier" {
   tags = {
     Name = "waf-teams-notifier"
   }
-
-  depends_on = [data.archive_file.teams_notifier_zip[0]]
 }
 
-# Teams Lambda ZIP file
-data "archive_file" "teams_notifier_zip" {
-  count       = var.teams_webhook_url != "" ? 1 : 0
-  type        = "zip"
-  output_path = "teams_notifier.zip"
-
-  source {
-    content  = file("${path.module}/lambda/teams_notifier.py")
-    filename = "index.py"
-  }
-}
-
-# IAM role for Teams Lambda
 resource "aws_iam_role" "teams_lambda_role" {
   count = var.teams_webhook_url != "" ? 1 : 0
   name  = "waf-teams-notifier-role"
@@ -194,7 +185,6 @@ resource "aws_iam_role" "teams_lambda_role" {
   }
 }
 
-# IAM policy for Teams Lambda
 resource "aws_iam_role_policy" "teams_lambda_policy" {
   count = var.teams_webhook_url != "" ? 1 : 0
   name  = "waf-teams-notifier-policy"
@@ -210,13 +200,12 @@ resource "aws_iam_role_policy" "teams_lambda_policy" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "arn:aws:logs:*:*:*"
+        Resource = "arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:*"
       }
     ]
   })
 }
 
-# SNS subscription for Teams Lambda
 resource "aws_sns_topic_subscription" "teams_notification" {
   count     = var.teams_webhook_url != "" ? 1 : 0
   topic_arn = aws_sns_topic.waf_notifications.arn
@@ -224,7 +213,6 @@ resource "aws_sns_topic_subscription" "teams_notification" {
   endpoint  = aws_lambda_function.teams_notifier[0].arn
 }
 
-# Teams Lambda permission for SNS
 resource "aws_lambda_permission" "teams_sns_invoke" {
   count         = var.teams_webhook_url != "" ? 1 : 0
   statement_id  = "AllowExecutionFromSNS"

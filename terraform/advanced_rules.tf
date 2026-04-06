@@ -1,10 +1,16 @@
-# 高度なWAFルール定義
+# =============================================================================
+# 高度なWAFルール定義 (2026年最新化)
+# - OWASP Top 10:2026対応
+# - AI駆動攻撃対策
+# - rate_based_statement構文修正 (and_statement内不可の制約対応)
+# =============================================================================
+
 locals {
   # 段階的制裁の閾値設定
-  stage1_threshold = var.count_threshold          # 警告レベル
-  stage2_threshold = var.rate_limit_requests      # 軽度制限
-  stage3_threshold = var.rate_limit_requests * 2  # 重度制限（再犯者）
-  stage4_threshold = var.rate_limit_requests * 3  # 最重度制限
+  stage1_threshold = var.count_threshold
+  stage2_threshold = var.rate_limit_requests
+  stage3_threshold = var.rate_limit_requests * 2
+  stage4_threshold = var.rate_limit_requests * 3
 }
 
 # WAFv2 Web ACL with Advanced Rules
@@ -16,7 +22,9 @@ resource "aws_wafv2_web_acl" "fail2ban_advanced_acl" {
     allow {}
   }
 
+  # =====================================================
   # Rule 1: WhiteList - 永久にBANしない (最高優先度)
+  # =====================================================
   rule {
     name     = "WhiteListRule"
     priority = 1
@@ -38,7 +46,9 @@ resource "aws_wafv2_web_acl" "fail2ban_advanced_acl" {
     }
   }
 
+  # =====================================================
   # Rule 2: BlackList - ずっとBANする
+  # =====================================================
   rule {
     name     = "BlackListRule"
     priority = 2
@@ -60,13 +70,20 @@ resource "aws_wafv2_web_acl" "fail2ban_advanced_acl" {
     }
   }
 
-  # Rule 3: 攻撃パターン検知 - 正規表現ベース
+  # =====================================================
+  # Rule 3: 従来型攻撃パターン検知 (SQLi, XSS, Traversal, RCE)
+  # =====================================================
   rule {
     name     = "AttackPatternRule"
     priority = 3
 
     action {
-      block {}
+      block {
+        custom_response {
+          response_code = 403
+          custom_response_body_key = "blocked"
+        }
+      }
     }
 
     statement {
@@ -79,6 +96,10 @@ resource "aws_wafv2_web_acl" "fail2ban_advanced_acl" {
             }
             text_transformation {
               priority = 0
+              type     = "URL_DECODE"
+            }
+            text_transformation {
+              priority = 1
               type     = "LOWERCASE"
             }
           }
@@ -93,6 +114,28 @@ resource "aws_wafv2_web_acl" "fail2ban_advanced_acl" {
               priority = 0
               type     = "URL_DECODE"
             }
+            text_transformation {
+              priority = 1
+              type     = "LOWERCASE"
+            }
+          }
+        }
+        statement {
+          regex_pattern_set_reference_statement {
+            arn = aws_wafv2_regex_pattern_set.attack_patterns.arn
+            field_to_match {
+              body {
+                oversize_handling = "MATCH"
+              }
+            }
+            text_transformation {
+              priority = 0
+              type     = "URL_DECODE"
+            }
+            text_transformation {
+              priority = 1
+              type     = "LOWERCASE"
+            }
           }
         }
       }
@@ -105,10 +148,84 @@ resource "aws_wafv2_web_acl" "fail2ban_advanced_acl" {
     }
   }
 
-  # Rule 4: 疑わしいUser-Agent検知
+  # =====================================================
+  # Rule 4: 2026年新規脅威パターン (SSRF, NoSQLi, Log4Shell, GraphQL)
+  # =====================================================
+  rule {
+    name     = "ModernAttackPatternRule"
+    priority = 4
+
+    action {
+      block {
+        custom_response {
+          response_code = 403
+          custom_response_body_key = "blocked"
+        }
+      }
+    }
+
+    statement {
+      or_statement {
+        statement {
+          regex_pattern_set_reference_statement {
+            arn = aws_wafv2_regex_pattern_set.modern_attack_patterns.arn
+            field_to_match {
+              uri_path {}
+            }
+            text_transformation {
+              priority = 0
+              type     = "URL_DECODE"
+            }
+            text_transformation {
+              priority = 1
+              type     = "LOWERCASE"
+            }
+          }
+        }
+        statement {
+          regex_pattern_set_reference_statement {
+            arn = aws_wafv2_regex_pattern_set.modern_attack_patterns.arn
+            field_to_match {
+              query_string {}
+            }
+            text_transformation {
+              priority = 0
+              type     = "URL_DECODE"
+            }
+            text_transformation {
+              priority = 1
+              type     = "LOWERCASE"
+            }
+          }
+        }
+        statement {
+          regex_pattern_set_reference_statement {
+            arn = aws_wafv2_regex_pattern_set.modern_attack_patterns.arn
+            field_to_match {
+              all_query_arguments {}
+            }
+            text_transformation {
+              priority = 0
+              type     = "URL_DECODE"
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "ModernAttackPatternRule"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # =====================================================
+  # Rule 5: 疑わしいUser-Agent検知 (AI自動化ツール対応)
+  # =====================================================
   rule {
     name     = "SuspiciousUserAgentRule"
-    priority = 4
+    priority = 5
 
     action {
       block {}
@@ -136,10 +253,12 @@ resource "aws_wafv2_web_acl" "fail2ban_advanced_acl" {
     }
   }
 
-  # Rule 5: Stage 1 - 警告レベル (Count)
+  # =====================================================
+  # Rule 6: Stage 1 - 警告レベル (Count)
+  # =====================================================
   rule {
     name     = "Stage1WarningRule"
-    priority = 5
+    priority = 6
 
     action {
       count {}
@@ -173,10 +292,12 @@ resource "aws_wafv2_web_acl" "fail2ban_advanced_acl" {
     }
   }
 
-  # Rule 6: Stage 2 - 軽度制限 (Block)
+  # =====================================================
+  # Rule 7: Stage 2 - 軽度制限 (Block)
+  # =====================================================
   rule {
     name     = "Stage2LightBlockRule"
-    priority = 6
+    priority = 7
 
     action {
       block {}
@@ -210,26 +331,27 @@ resource "aws_wafv2_web_acl" "fail2ban_advanced_acl" {
     }
   }
 
-  # Rule 7: Stage 3 - 再犯者への重度制限
+  # =====================================================
+  # Rule 8: Stage 3 - 再犯者への重度制限
+  # NOTE: rate_based_statementはand_statement内に配置不可のため
+  #       scope_down_statementでIP Set参照に変更
+  # =====================================================
   rule {
     name     = "Stage3RepeatOffenderRule"
-    priority = 7
+    priority = 8
 
     action {
       block {}
     }
 
     statement {
-      and_statement {
-        statement {
+      rate_based_statement {
+        limit              = local.stage3_threshold
+        aggregate_key_type = "IP"
+
+        scope_down_statement {
           ip_set_reference_statement {
             arn = aws_wafv2_ip_set.repeat_offenders.arn
-          }
-        }
-        statement {
-          rate_based_statement {
-            limit              = local.stage3_threshold
-            aggregate_key_type = "IP"
           }
         }
       }
@@ -242,26 +364,25 @@ resource "aws_wafv2_web_acl" "fail2ban_advanced_acl" {
     }
   }
 
-  # Rule 8: Stage 4 - 重度犯罪者への最重度制限
+  # =====================================================
+  # Rule 9: Stage 4 - 重度犯罪者への最重度制限
+  # =====================================================
   rule {
     name     = "Stage4HeavyOffenderRule"
-    priority = 8
+    priority = 9
 
     action {
       block {}
     }
 
     statement {
-      and_statement {
-        statement {
+      rate_based_statement {
+        limit              = local.stage4_threshold
+        aggregate_key_type = "IP"
+
+        scope_down_statement {
           ip_set_reference_statement {
             arn = aws_wafv2_ip_set.heavy_offenders.arn
-          }
-        }
-        statement {
-          rate_based_statement {
-            limit              = local.stage4_threshold
-            aggregate_key_type = "IP"
           }
         }
       }
@@ -272,6 +393,51 @@ resource "aws_wafv2_web_acl" "fail2ban_advanced_acl" {
       metric_name                = "Stage4HeavyOffenderRule"
       sampled_requests_enabled   = true
     }
+  }
+
+  # =====================================================
+  # Rule 10: 大量リクエストヘッダー検知 (HTTP Flood / Slowloris対策)
+  # =====================================================
+  rule {
+    name     = "OversizedHeaderRule"
+    priority = 10
+
+    action {
+      block {}
+    }
+
+    statement {
+      size_constraint_statement {
+        field_to_match {
+          headers {
+            match_pattern {
+              all {}
+            }
+            match_scope      = "ALL"
+            oversize_handling = "MATCH"
+          }
+        }
+        comparison_operator = "GT"
+        size                = 8192
+        text_transformation {
+          priority = 0
+          type     = "NONE"
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "OversizedHeaderRule"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # カスタムレスポンスボディ定義
+  custom_response_body {
+    key          = "blocked"
+    content      = "{\"error\": \"Access Denied\", \"code\": 403}"
+    content_type = "APPLICATION_JSON"
   }
 
   visibility_config {

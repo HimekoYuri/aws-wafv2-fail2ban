@@ -1,14 +1,18 @@
-# 攻撃パターン検知アラーム
+# =============================================================================
+# 高度なCloudWatchアラーム (2026年対応)
+# =============================================================================
+
+# 従来型攻撃パターン検知アラーム
 resource "aws_cloudwatch_metric_alarm" "attack_pattern_alarm" {
   alarm_name          = "waf-attack-pattern-detected"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
+  evaluation_periods  = 1
   metric_name         = "BlockedRequests"
   namespace           = "AWS/WAFV2"
-  period              = "300"
+  period              = 300
   statistic           = "Sum"
-  threshold           = "5"
-  alarm_description   = "Attack patterns detected - potential security threat"
+  threshold           = 5
+  alarm_description   = "Classic attack patterns detected (SQLi/XSS/Traversal/RCE)"
   alarm_actions       = [aws_sns_topic.waf_notifications.arn]
 
   dimensions = {
@@ -21,17 +25,40 @@ resource "aws_cloudwatch_metric_alarm" "attack_pattern_alarm" {
   }
 }
 
+# 2026年新規脅威パターン検知アラーム
+resource "aws_cloudwatch_metric_alarm" "modern_attack_pattern_alarm" {
+  alarm_name          = "waf-modern-attack-pattern-detected"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "BlockedRequests"
+  namespace           = "AWS/WAFV2"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 3
+  alarm_description   = "Modern attack patterns detected (SSRF/NoSQLi/Log4Shell/GraphQL)"
+  alarm_actions       = [aws_sns_topic.waf_notifications.arn]
+
+  dimensions = {
+    WebACL = aws_wafv2_web_acl.fail2ban_advanced_acl.name
+    Rule   = "ModernAttackPatternRule"
+  }
+
+  tags = {
+    Name = "waf-modern-attack-pattern-alarm"
+  }
+}
+
 # 疑わしいUser-Agent検知アラーム
 resource "aws_cloudwatch_metric_alarm" "suspicious_user_agent_alarm" {
   alarm_name          = "waf-suspicious-user-agent-detected"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
+  evaluation_periods  = 1
   metric_name         = "BlockedRequests"
   namespace           = "AWS/WAFV2"
-  period              = "300"
+  period              = 300
   statistic           = "Sum"
-  threshold           = "10"
-  alarm_description   = "Suspicious User-Agent detected - potential bot activity"
+  threshold           = 10
+  alarm_description   = "Suspicious User-Agent detected (bot/AI scanner/scraper)"
   alarm_actions       = [aws_sns_topic.waf_notifications.arn]
 
   dimensions = {
@@ -48,13 +75,13 @@ resource "aws_cloudwatch_metric_alarm" "suspicious_user_agent_alarm" {
 resource "aws_cloudwatch_metric_alarm" "stage1_warning_alarm" {
   alarm_name          = "waf-stage1-warning-threshold"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
+  evaluation_periods  = 1
   metric_name         = "AllowedRequests"
   namespace           = "AWS/WAFV2"
-  period              = "300"
+  period              = 300
   statistic           = "Sum"
   threshold           = var.count_threshold
-  alarm_description   = "Stage 1 warning threshold exceeded - monitoring suspicious activity"
+  alarm_description   = "Stage 1 warning threshold exceeded"
   alarm_actions       = [aws_sns_topic.waf_notifications.arn]
 
   dimensions = {
@@ -71,12 +98,12 @@ resource "aws_cloudwatch_metric_alarm" "stage1_warning_alarm" {
 resource "aws_cloudwatch_metric_alarm" "stage2_block_alarm" {
   alarm_name          = "waf-stage2-light-block"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
+  evaluation_periods  = 1
   metric_name         = "BlockedRequests"
   namespace           = "AWS/WAFV2"
-  period              = "300"
+  period              = 300
   statistic           = "Sum"
-  threshold           = "0"
+  threshold           = 0
   alarm_description   = "Stage 2 light blocking activated - IP will be added to repeat offenders"
   alarm_actions       = [aws_sns_topic.waf_notifications.arn]
 
@@ -94,12 +121,12 @@ resource "aws_cloudwatch_metric_alarm" "stage2_block_alarm" {
 resource "aws_cloudwatch_metric_alarm" "stage3_repeat_offender_alarm" {
   alarm_name          = "waf-stage3-repeat-offender-block"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
+  evaluation_periods  = 1
   metric_name         = "BlockedRequests"
   namespace           = "AWS/WAFV2"
-  period              = "300"
+  period              = 300
   statistic           = "Sum"
-  threshold           = "0"
+  threshold           = 0
   alarm_description   = "Stage 3 repeat offender blocking - IP will be escalated to heavy offenders"
   alarm_actions       = [aws_sns_topic.waf_notifications.arn]
 
@@ -117,13 +144,13 @@ resource "aws_cloudwatch_metric_alarm" "stage3_repeat_offender_alarm" {
 resource "aws_cloudwatch_metric_alarm" "stage4_heavy_offender_alarm" {
   alarm_name          = "waf-stage4-heavy-offender-block"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = "1"
+  evaluation_periods  = 1
   metric_name         = "BlockedRequests"
   namespace           = "AWS/WAFV2"
-  period              = "300"
+  period              = 300
   statistic           = "Sum"
-  threshold           = "0"
-  alarm_description   = "Stage 4 heavy offender blocking - maximum security level activated"
+  threshold           = 0
+  alarm_description   = "Stage 4 heavy offender blocking - maximum security level"
   alarm_actions       = [aws_sns_topic.waf_notifications.arn]
 
   dimensions = {
@@ -133,5 +160,28 @@ resource "aws_cloudwatch_metric_alarm" "stage4_heavy_offender_alarm" {
 
   tags = {
     Name = "waf-stage4-heavy-offender-alarm"
+  }
+}
+
+# 大量ヘッダー検知アラーム
+resource "aws_cloudwatch_metric_alarm" "oversized_header_alarm" {
+  alarm_name          = "waf-oversized-header-detected"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "BlockedRequests"
+  namespace           = "AWS/WAFV2"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 5
+  alarm_description   = "Oversized HTTP headers detected - potential HTTP flood/Slowloris"
+  alarm_actions       = [aws_sns_topic.waf_notifications.arn]
+
+  dimensions = {
+    WebACL = aws_wafv2_web_acl.fail2ban_advanced_acl.name
+    Rule   = "OversizedHeaderRule"
+  }
+
+  tags = {
+    Name = "waf-oversized-header-alarm"
   }
 }

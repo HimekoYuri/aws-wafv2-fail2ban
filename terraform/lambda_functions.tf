@@ -1,4 +1,8 @@
-# Lambda関数用のIAMロール
+# =============================================================================
+# IP Manager Lambda関数 (TTL対応)
+# =============================================================================
+
+# IAMロール
 resource "aws_iam_role" "ip_manager_lambda_role" {
   name = "fail2ban-ip-manager-lambda-role"
 
@@ -16,7 +20,7 @@ resource "aws_iam_role" "ip_manager_lambda_role" {
   })
 }
 
-# Lambda関数用のIAMポリシー
+# IAMポリシー
 resource "aws_iam_role_policy" "ip_manager_lambda_policy" {
   name = "fail2ban-ip-manager-lambda-policy"
   role = aws_iam_role.ip_manager_lambda_role.id
@@ -25,6 +29,7 @@ resource "aws_iam_role_policy" "ip_manager_lambda_policy" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "CloudWatchLogs"
         Effect = "Allow"
         Action = [
           "logs:CreateLogGroup",
@@ -33,9 +38,10 @@ resource "aws_iam_role_policy" "ip_manager_lambda_policy" {
           "logs:StartQuery",
           "logs:GetQueryResults"
         ]
-        Resource = "arn:aws:logs:*:*:*"
+        Resource = "arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:*"
       },
       {
+        Sid    = "WAFv2IPSets"
         Effect = "Allow"
         Action = [
           "wafv2:GetIPSet",
@@ -47,6 +53,7 @@ resource "aws_iam_role_policy" "ip_manager_lambda_policy" {
         ]
       },
       {
+        Sid    = "CloudWatchMetrics"
         Effect = "Allow"
         Action = [
           "cloudwatch:GetMetricStatistics",
@@ -58,22 +65,22 @@ resource "aws_iam_role_policy" "ip_manager_lambda_policy" {
   })
 }
 
-# Lambda関数のZIPファイル作成
+# Lambda ZIP
 data "archive_file" "ip_manager_lambda_zip" {
   type        = "zip"
   source_file = "${path.module}/lambda/ip_manager.py"
   output_path = "${path.module}/lambda/ip_manager.zip"
 }
 
-# IP管理用Lambda関数
+# Lambda関数
 resource "aws_lambda_function" "ip_manager" {
   filename         = data.archive_file.ip_manager_lambda_zip.output_path
   function_name    = "fail2ban-ip-manager"
-  role            = aws_iam_role.ip_manager_lambda_role.arn
-  handler         = "ip_manager.handler"
-  runtime         = var.lambda_python_runtime
-  timeout         = 60
-
+  role             = aws_iam_role.ip_manager_lambda_role.arn
+  handler          = "ip_manager.handler"
+  runtime          = var.lambda_python_runtime
+  timeout          = 120
+  memory_size      = 256
   source_code_hash = data.archive_file.ip_manager_lambda_zip.output_base64sha256
 
   environment {
@@ -82,6 +89,7 @@ resource "aws_lambda_function" "ip_manager" {
       HEAVY_OFFENDERS_IP_SET_ID    = aws_wafv2_ip_set.heavy_offenders.id
       REPEAT_OFFENDERS_IP_SET_NAME = aws_wafv2_ip_set.repeat_offenders.name
       HEAVY_OFFENDERS_IP_SET_NAME  = aws_wafv2_ip_set.heavy_offenders.name
+      IP_TTL_HOURS                 = tostring(var.ip_ttl_hours)
     }
   }
 
@@ -90,7 +98,17 @@ resource "aws_lambda_function" "ip_manager" {
   }
 }
 
-# SNSトピックからLambda関数への権限
+# CloudWatch Log Group for Lambda
+resource "aws_cloudwatch_log_group" "ip_manager_logs" {
+  name              = "/aws/lambda/fail2ban-ip-manager"
+  retention_in_days = 14
+
+  tags = {
+    Name = "fail2ban-ip-manager-logs"
+  }
+}
+
+# SNS → Lambda 権限
 resource "aws_lambda_permission" "allow_sns_ip_manager" {
   statement_id  = "AllowExecutionFromSNS"
   action        = "lambda:InvokeFunction"
@@ -99,7 +117,7 @@ resource "aws_lambda_permission" "allow_sns_ip_manager" {
   source_arn    = aws_sns_topic.waf_notifications.arn
 }
 
-# SNSトピックのサブスクリプション（IP管理用）
+# SNSサブスクリプション
 resource "aws_sns_topic_subscription" "ip_manager_subscription" {
   topic_arn = aws_sns_topic.waf_notifications.arn
   protocol  = "lambda"
