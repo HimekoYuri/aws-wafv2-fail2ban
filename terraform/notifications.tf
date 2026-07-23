@@ -60,6 +60,10 @@ resource "aws_lambda_function" "slack_notifier" {
   timeout          = 30
   source_code_hash = data.archive_file.slack_notifier_zip[0].output_base64sha256
 
+  tracing_config {
+    mode = "Active"
+  }
+
   environment {
     variables = {
       SLACK_WEBHOOK_URL = var.slack_webhook_url
@@ -110,6 +114,15 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "logs:PutLogEvents"
         ]
         Resource = "arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:*"
+      },
+      {
+        Sid    = "XRayTracing"
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -151,6 +164,10 @@ resource "aws_lambda_function" "teams_notifier" {
   runtime          = var.lambda_python_runtime
   timeout          = 30
   source_code_hash = data.archive_file.teams_notifier_zip[0].output_base64sha256
+
+  tracing_config {
+    mode = "Active"
+  }
 
   environment {
     variables = {
@@ -201,6 +218,15 @@ resource "aws_iam_role_policy" "teams_lambda_policy" {
           "logs:PutLogEvents"
         ]
         Resource = "arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:*"
+      },
+      {
+        Sid    = "XRayTracing"
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords"
+        ]
+        Resource = "*"
       }
     ]
   })

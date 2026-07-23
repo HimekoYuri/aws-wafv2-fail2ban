@@ -24,3 +24,11 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Lambda ビルド成果物 (archive_file が生成する)
+terraform/lambda/*.zip
