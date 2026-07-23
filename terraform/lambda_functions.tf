@@ -41,6 +41,15 @@ resource "aws_iam_role_policy" "ip_manager_lambda_policy" {
         Resource = "arn:aws:logs:*:${data.aws_caller_identity.current.account_id}:*"
       },
       {
+        Sid    = "XRayTracing"
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "WAFv2IPSets"
         Effect = "Allow"
         Action = [
@@ -82,6 +91,11 @@ resource "aws_lambda_function" "ip_manager" {
   timeout          = 120
   memory_size      = 256
   source_code_hash = data.archive_file.ip_manager_lambda_zip.output_base64sha256
+
+  # IPセットの更新履歴を追跡できるようにX-Rayトレースを有効化する
+  tracing_config {
+    mode = "Active"
+  }
 
   environment {
     variables = {
